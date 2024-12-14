@@ -10,12 +10,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make the script executable
-RUN chmod +x /app/start.sh
-
-# Set environment variables
+# Set environment variables with defaults
 ENV PORT=8000
 ENV ENVIRONMENT=production
+ENV PYTHONPATH=/app
+
+# Expose the port
+EXPOSE ${PORT}
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${PORT}", "--workers", "1"]
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
