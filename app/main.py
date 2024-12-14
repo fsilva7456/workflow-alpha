@@ -12,6 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize FastAPI app
 app = FastAPI(
     title="Workflow Automation API",
     description="API for executing LLM-based workflow tasks",
@@ -27,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add request logging middleware
+# Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     logger.info(f"Incoming request: {request.method} {request.url}")
@@ -42,20 +43,30 @@ async def log_requests(request: Request, call_next):
             content={"detail": "Internal server error"}
         )
 
-# Add a root endpoint for basic health check
+# Root endpoint for basic health check
 @app.get("/")
 async def root():
+    """Root endpoint for basic health check"""
     return {"status": "ok", "message": "Service is running"}
 
 # Include routers
 app.include_router(health.router, tags=["health"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 
-# Startup event handler
+# Startup event
 @app.on_event("startup")
 async def startup_event():
-    port = os.getenv("PORT", 8000)
-    logger.info(f"Starting application on port {port}")
+    # Get environment variables
+    port = os.getenv("PORT", "8000")
+    environment = os.getenv("ENVIRONMENT", "development")
+    
+    # Log startup information
+    logger.info("Starting application...")
+    logger.info(f"Environment: {environment}")
+    logger.info(f"Port: {port}")
+    logger.info(f"Python path: {os.getenv('PYTHONPATH', 'not set')}")
+    
+    # Log all environment variables for debugging
     logger.info("Environment variables:")
-    logger.info(f"PORT: {os.getenv('PORT', 'not set')}")
-    logger.info(f"ENVIRONMENT: {os.getenv('ENVIRONMENT', 'not set')}")
+    for key, value in os.environ.items():
+        logger.info(f"{key}: {value if 'SECRET' not in key.upper() else '[REDACTED]'}")
