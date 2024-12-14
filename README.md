@@ -4,15 +4,77 @@ This FastAPI-based backend service provides an API for executing LLM-based workf
 
 ## Features
 
-- FastAPI-based REST API
+- FastAPI-based REST API with input validation
 - Endpoint for executing LLM tasks
-- Input validation using Pydantic models
+- Health check endpoint
+- Comprehensive logging
 - Docker containerization
 - Railway deployment configuration
 
-## Setup
+## Testing the Live API
 
-### Local Development
+The API is deployed and can be tested using the following endpoints:
+
+### Health Check
+
+```bash
+curl https://your-railway-url/api/v1/health-check
+```
+
+Expected response:
+```json
+{
+    "status": "ok"
+}
+```
+
+### Execute LLM Task
+
+```bash
+curl -X POST https://your-railway-url/api/v1/execute-llm \
+     -H "Content-Type: application/json" \
+     -d '{
+         "prompt": "Write a short story about a robot",
+         "model": "claude",
+         "parameters": {
+             "temperature": 0.7,
+             "max_tokens": 1000
+         }
+     }'
+```
+
+Expected response:
+```json
+{
+    "response": "Mock response from claude: Based on your prompt 'Write a short story about a robot', here is a simulated response."
+}
+```
+
+### Error Handling Examples
+
+1. Invalid model:
+```bash
+curl -X POST https://your-railway-url/api/v1/execute-llm \
+     -H "Content-Type: application/json" \
+     -d '{
+         "prompt": "Test prompt",
+         "model": "invalid-model",
+         "parameters": {}
+     }'
+```
+
+2. Empty prompt:
+```bash
+curl -X POST https://your-railway-url/api/v1/execute-llm \
+     -H "Content-Type: application/json" \
+     -d '{
+         "prompt": "",
+         "model": "claude",
+         "parameters": {}
+     }'
+```
+
+## Local Development
 
 1. Clone the repository:
 ```bash
@@ -31,94 +93,66 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Create `.env` file:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-5. Run the development server:
+4. Run the development server:
 ```bash
 uvicorn app.main:app --reload
 ```
 
 The API will be available at `http://localhost:8000`
 
-### Railway Deployment
+## API Documentation
 
-1. Install the Railway CLI:
+After starting the server, visit:
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+
+## Validation Steps
+
+1. Verify the service is running:
 ```bash
-npm i -g @railway/cli
+curl https://your-railway-url/api/v1/health-check
 ```
 
-2. Login to Railway:
+2. Test input validation:
 ```bash
-railway login
+# Test with valid input
+curl -X POST https://your-railway-url/api/v1/execute-llm \
+     -H "Content-Type: application/json" \
+     -d '{
+         "prompt": "Test prompt",
+         "model": "claude",
+         "parameters": {}
+     }'
+
+# Test with invalid model
+curl -X POST https://your-railway-url/api/v1/execute-llm \
+     -H "Content-Type: application/json" \
+     -d '{
+         "prompt": "Test prompt",
+         "model": "invalid-model",
+         "parameters": {}
+     }'
 ```
 
-3. Link your project:
-```bash
-railway link
-```
+3. Check logs in Railway dashboard for request tracking
 
-4. Deploy the application:
+## Error Codes
+
+- 200: Successful request
+- 400: Bad request (invalid input)
+- 500: Internal server error
+
+## Deployment
+
+The application is configured for automatic deployment on Railway. Any push to the main branch will trigger a new deployment.
+
+To deploy manually:
+
 ```bash
 railway up
 ```
 
-## API Documentation
+## Environment Variables
 
-After starting the server, visit:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-### Execute LLM Endpoint
-
-**POST** `/api/v1/execute-llm`
-
-Request body:
-```json
-{
-    "prompt": "Your input prompt",
-    "model": "Claude",
-    "parameters": {
-        "temperature": 0.7,
-        "max_tokens": 1000
-    }
-}
-```
-
-Response:
-```json
-{
-    "response": "LLM response text"
-}
-```
-
-## Directory Structure
-
-```
-/workflow-alpha
-├── /app
-│   ├── __init__.py
-│   ├── main.py
-│   ├── /routes
-│   │   ├── __init__.py
-│   │   ├── llm.py
-│   ├── /services
-│   │   ├── __init__.py
-│   │   ├── llm_service.py
-├── requirements.txt
-├── Dockerfile
-├── railway.json
-├── .env.example
-├── README.md
-```
-
-## Future Improvements
-
-- Integration with actual LLM APIs (OpenAI, Anthropic)
-- Authentication and rate limiting
-- Request/response logging
-- Error tracking
-- Monitoring and analytics
+- `PORT`: Port number (default: 8000)
+- `ENVIRONMENT`: Runtime environment (development/production)
