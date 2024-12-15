@@ -79,15 +79,16 @@ def verify_api_key():
 
 @app.get("/")
 def read_root():
-    return {"message": "API is running"}
+    return {"message": "Hello World"}
 
 @app.get("/health-check")
 def health_check():
     return {"status": "ok"}
 
-@app.post("/api/v1/execute-llm", response_model=LLMResponse)
+@app.post("/execute-llm", response_model=LLMResponse)
 async def execute_llm(request: LLMRequest, api_key_valid: bool = Depends(verify_api_key)):
     try:
+        print(f"Received request for model: {request.model}")
         # Create chat completion
         completion = client.chat.completions.create(
             model=request.model,
@@ -101,10 +102,12 @@ async def execute_llm(request: LLMRequest, api_key_valid: bool = Depends(verify_
         
         # Extract the response
         response = completion.choices[0].message.content
+        print(f"Generated response with length: {len(response)}")
         
         return LLMResponse(response=response)
 
     except Exception as e:
+        print(f"Error in execute_llm: {str(e)}")
         if 'api_key' in str(e).lower():
             raise HTTPException(
                 status_code=401,
