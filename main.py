@@ -3,33 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, Literal
 from openai import OpenAI
-from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-
-# Startup event to verify OpenAI connection
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Verify OpenAI API key on startup
-    try:
-        # Test API connection with a simple completion
-        client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": "test"}],
-            max_tokens=5
-        )
-        print("Successfully connected to OpenAI API")
-    except Exception as e:
-        print(f"Error connecting to OpenAI API: {str(e)}")
-    yield
-
-app = FastAPI(lifespan=lifespan)
+# Create FastAPI app
+app = FastAPI(title="LLM API")
 
 # Configure CORS
 app.add_middleware(
@@ -41,79 +27,45 @@ app.add_middleware(
 )
 
 class LLMRequest(BaseModel):
-    prompt: str = Field(..., description="Input prompt for the LLM", min_length=1)
-    model: Literal["gpt-4", "gpt-3.5-turbo"] = Field(
-        default="gpt-3.5-turbo",
-        description="Name of the OpenAI model to use"
-    )
-    parameters: Optional[Dict] = Field(
-        default={
-            "temperature": 0.7,
-            "max_tokens": 1000
-        },
-        description="Optional model parameters"
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "prompt": "Write a short story about a robot",
-                "model": "gpt-3.5-turbo",
-                "parameters": {
-                    "temperature": 0.7,
-                    "max_tokens": 1000
-                }
-            }
-        }
+    prompt: str = Field(..., description="Input prompt for the LLM")
+    model: Literal["gpt-4", "gpt-3.5-turbo"] = "gpt-3.5-turbo"
+    parameters: Dict = Field(default_factory=lambda: {
+        "temperature": 0.7,
+        "max_tokens": 1000
+    })
 
 class LLMResponse(BaseModel):
     response: str
 
-def verify_api_key():
-    if not os.getenv('OPENAI_API_KEY'):
-        raise HTTPException(
-            status_code=500,
-            detail="OpenAI API key not configured"
-        )
-    return True
-
 @app.get("/")
-def read_root():
+async def root():
+    logger.info("Root endpoint called")
     return {"message": "Hello World"}
 
 @app.get("/health-check")
-def health_check():
+async def health_check():
+    logger.info("Health check endpoint called")
     return {"status": "ok"}
 
-@app.post("/execute-llm", response_model=LLMResponse)
-async def execute_llm(request: LLMRequest, api_key_valid: bool = Depends(verify_api_key)):
+@app.post("/generate", response_model=LLMResponse)
+async def generate_text(request: LLMRequest):
+    logger.info(f"Generate endpoint called with model: {request.model}")
     try:
-        print(f"Received request for model: {request.model}")
-        # Create chat completion
+        # Initialize OpenAI client
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        
+        # Call OpenAI API
         completion = client.chat.completions.create(
             model=request.model,
-            messages=[{
-                "role": "user",
-                "content": request.prompt
-            }],
+            messages=[{"role": "user", "content": request.prompt}],
             temperature=request.parameters.get("temperature", 0.7),
             max_tokens=request.parameters.get("max_tokens", 1000)
         )
         
-        # Extract the response
         response = completion.choices[0].message.content
-        print(f"Generated response with length: {len(response)}")
-        
+        logger.info("Successfully generated response")
         return LLMResponse(response=response)
-
+        
     except Exception as e:
-        print(f"Error in execute_llm: {str(e)}")
-        if 'api_key' in str(e).lower():
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid OpenAI API key"
-            )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calling OpenAI API: {str(e)}"
-        )
+        logger.error(f"Error in generate_text: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
